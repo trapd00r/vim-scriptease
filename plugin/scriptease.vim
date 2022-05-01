@@ -155,4 +155,58 @@ augroup scriptease_projectionist
   autocmd User ProjectionistDetect call s:projectionist_detect()
 augroup END
 
-" vim:set et sw=2:
+" :Execute; eval line(s) of viml from inside Vim
+function! scriptease#scriptid(filename) abort
+  let filename = fnamemodify(expand(a:filename), ':p')
+  for script in s:names()
+    if script.filename ==# filename
+      return +script.text
+    endif
+  endfor
+  return ''
+endfunction
+
+if !exists('s:sourceable')
+  let s:sourceable = tempname().'.vim'
+endif
+
+function! s:execute(first, last, count) abort
+  if a:count
+    let lines = getline(a:first, a:last)
+  else
+    let first = a:first
+    while first > 1 && first =~# '^\s\+$'
+      let first -= 1
+    endwhile
+    if getline(a:first) !~# '^\s' && getline(a:first+1) =~# '^\s'
+      let first += 1
+    elseif getline(a:first) !~# '^\s' && getline(a:first-1) =~# '^\s'
+      let first -= 1
+    endif
+    let last = first
+    while first > 1 && getline(first) =~# '^\%(\s\|$\)'
+      let first -= 1
+    endwhile
+    while last < line('$') && getline(last) =~# '^\%(\s\|$\)'
+      let last += 1
+    endwhile
+    let lines = getline(first, last)
+  endif
+  let len = len(lines)
+  let id = scriptease#scriptid('%')
+  if id
+"    call map(lines, 's:gsub(v:val, "\\<SID\\>|s:\\ze\\w+\\s*\\(", "<SNR>".id."_")')
+  endif
+  call writefile(lines, s:sourceable)
+  let info = len . ' line'. (len==1?'':'s') . ' executed'
+  if &verbose
+    echo join(lines, "\n")
+  endif
+  return 'source '.s:sourceable.'|echo '.string(info)
+endfunction
+
+augroup scriptease_execute
+  autocmd!
+  autocmd FileType vim command! -bar -buffer -range=0 Execute
+        \ exec s:execute(<line1>, <line2>, <count>)
+augroup END
